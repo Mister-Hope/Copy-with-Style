@@ -255,7 +255,7 @@ export default class CopyWithStyle {
 			console.log(
 				`Configuring progress: ${progress instanceof HTMLElement}, ${
 					progress.tagName
-				}, ${button.parentElement.querySelector("progress")}, ${
+				}, ${button.parentElement!.querySelector("progress")}, ${
 					this.showProgress
 				}`
 			);
@@ -263,7 +263,7 @@ export default class CopyWithStyle {
 		this.progress =
 			progress instanceof HTMLElement && progress.tagName === "PROGRESS"
 				? progress
-				: button.parentElement.querySelector("progress");
+				: button.parentElement!.querySelector("progress");
 
 		// If we're showing a progress bar we MUST defer to UI or it won't update
 		if (this.showProgress && this.progress)
