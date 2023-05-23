@@ -20,30 +20,87 @@
  * @license Hippocratic License Version Number: 2.1.
  */
 
-export default class Copy_With_Style {
-	element = null; // The element to copy to the clipboard (with style!)
-	button = null; // The button that, we attach a click event handler to copy the element to clipboard
-	mode = null; // "attribute" (to inline all styles with a "style" attribute on each element) or "tag" (to include a "style" tag)
-	progress = null; // A progress element that is a sibling or child of the button by default but can be specified explicitly.
-	stylesheets = "inline";
+export interface CopyWithStyleOptions {
+	/**
+	 * The element to copy to the clipboard (with style!)
+	 */
+	element: HTMLElement;
+
+	/**
+	 * The button that, we attach a click event handler to copy the element to clipboard
+	 */
+	button: HTMLElement;
+
+	/**
+	 * A progress element that is a sibling or child of the button by default but can be specified explicitly.
+	 */
+	progress?: HTMLElement | boolean;
+
+	stylesheets?: string[];
+	/**
+	 * @default true
+	 */
+	summarizeDetails?: boolean;
+
+	/**
+	 * - "attribute" (to inline all styles with a "style" attribute on each element)
+	 * - "tag" (to include a "style" tag)
+	 */
+	mode?: "attribute" | "tag";
+	defer?: [number, number];
+	triggers?: ("button" | "schedule" | "observe")[];
+
+	/**
+	 * @default true
+	 */
+	observe?: boolean;
+
+	/**
+	 * @default true
+	 */
+	copyWrapper?: boolean;
+
+	classButton?: string;
+	classPreparing?: string;
+	classReady?: string;
+	/**
+	 * @default false
+	 */
+	debug?: boolean;
+	/**
+	 * @default false
+	 */
+	logPerformance?: boolean;
+	logHTML?: boolean;
+	logText?: boolean;
+}
+
+export default class CopyWithStyle {
+	element: HTMLElement;
+
+	button: HTMLElement;
+
+	mode: "attribute" | "tag";
+	progress: HTMLElement | null;
+	stylesheets: string[];
 
 	// The <details> tag renders badly when inlined. Most mail readers show the summary AND details.
 	// So we might want to replace the whole <details> tag with it's <summary> when inlining. Only
 	// relevant when mode == "attribute"
-	summarize_details = true;
+	summarizeDetails = true;
 
 	// Show a progress bar if we can find one as a sibling or child of element
-	show_progress = true;
+	showProgress = true;
 
 	// We wrap the nominated element in a div that is not in the DOM. We can copy the wrapper
 	// with the element or not. Matters little as it's a simple div.
-	copy_wrapper = true;
+	copyWrapper = true;
 
 	// Styling classes for the button. These classes will be appended to the button representing state of
 	// the preparation and copy.
-	class_button = null;
-	class_preparing = null;
-	class_ready = null;
+	buttonClass: string;
+	prepareClass: string;
+	readyClass: string;
 
 	// Element exclusion overrides and augmentations. These are functions that are called
 	// if defined and passed an HTML element as their sole argument. They must return true or
@@ -54,10 +111,10 @@ export default class Copy_With_Style {
 	//
 	// Deep exclusions exclude the element and all its children.
 	// Shallow exclusion exclude the element and graft its children onto its parent.
-	deep_exclusions = null;
-	shallow_exclusions = null;
-	extra_deep_exclusions = null;
-	extra_shallow_exclusions = null;
+	deepExclusions = null;
+	shallowExclusions = null;
+	extraDeepExclusions = null;
+	extraShallowExclusions = null;
 
 	// If we are inlining styles on a huge element we may wish to permit a responsive UI while we're inlining it.
 	// This will slow down inlining enormously though, and may never have a net reward. In one trial Chrome processed
@@ -124,11 +181,11 @@ export default class Copy_With_Style {
 	text = "";
 
 	// If true log the HTML or text rendition prepared, and the HTML or text put onto the clipboard to the console, for diagnostic purposes.
-	log_HTML_to_console = false;
-	log_text_to_console = false;
+	logHTML = false;
+	logText = false;
 
 	// Write a performance summary to console
-	log_performance = false;
+	logPerformance = false;
 
 	// Write useful tracing info out to console
 	debug = false;
@@ -141,57 +198,57 @@ export default class Copy_With_Style {
 	******************************************************************************************/
 
 	constructor({
-		button,
 		element,
+		button,
+		progress = false,
 		stylesheets = [],
-		summarize_details = true,
+		summarizeDetails = true,
 		mode = "attribute",
 		defer = [50000, 0],
 		triggers = ["button"],
 		observe = true,
-		progress = false,
-		copy_wrapper = true,
-		class_button = "copy_with_style",
-		class_preparing = "preparing_for_copy",
-		class_ready = "ready_to_copy",
-		deep_exclusions = null,
-		shallow_exclusions = null,
-		extra_deep_exclusions = null,
-		extra_shallow_exclusions = null,
+		copyWrapper = true,
+		classButton = "copy-button",
+		classPreparing = "preparing",
+		classReady = "ready",
+		deepExclusions = null,
+		shallowExclusions = null,
+		extraDeepExclusions = null,
+		extraShallowExclusions = null,
 		debug = false,
-		log_performance = false,
-		log_HTML_to_console = false,
-		log_text_to_console = false,
+		logPerformance = false,
+		logHTML = false,
+		logText = false,
 		check_clone_integrity = false,
 		classes_to_debug = [],
 		styles_to_debug = [],
 		tags_to_debug = [],
-	} = {}) {
-		this.button = button;
+	}: CopyWithStyleOptions) {
 		this.element = element;
+		this.button = button;
 		this.stylesheets = stylesheets;
-		this.summarize_details = summarize_details;
+		this.summarizeDetails = summarizeDetails;
 		this.mode = mode;
 		this.defer_to_UI = defer;
 		this.triggers = triggers;
 		this.observe = observe;
-		this.show_progress = progress ? true : false;
-		this.copy_wrapper = copy_wrapper;
-		(this.class_button = class_button),
-			(this.class_preparing = class_preparing),
-			(this.class_ready = class_ready),
-			(this.deep_exclusions = deep_exclusions),
-			(this.shallow_exclusions = shallow_exclusions),
-			(this.extra_deep_exclusions = extra_deep_exclusions),
-			(this.extra_shallow_exclusions = extra_shallow_exclusions),
-			(this.debug = debug);
-		this.log_performance = log_performance;
-		this.log_HTML_to_console = log_HTML_to_console;
-		this.log_text_to_console = log_text_to_console;
+		this.showProgress = Boolean(progress);
+		this.copyWrapper = copyWrapper;
+		this.buttonClass = classButton;
+		this.prepareClass = classPreparing;
+		this.readyClass = classReady;
+		this.deepExclusions = deepExclusions;
+		this.shallowExclusions = shallowExclusions;
+		this.extraDeepExclusions = extraDeepExclusions;
+		this.extraShallowExclusions = extraShallowExclusions;
 		this.check_clone_integrity = check_clone_integrity;
 		this.classes_to_debug = classes_to_debug;
 		this.styles_to_debug = styles_to_debug;
 		this.tags_to_debug = tags_to_debug.map((name) => name.toUpperCase()); // tagNames reported in JS are always Uppercase
+		this.debug = debug;
+		this.logPerformance = logPerformance;
+		this.logHTML = logHTML;
+		this.logText = logText;
 
 		if (this.debug) console.clear();
 		if (this.debug)
@@ -199,7 +256,7 @@ export default class Copy_With_Style {
 				`Configuring progress: ${progress instanceof HTMLElement}, ${
 					progress.tagName
 				}, ${button.parentElement.querySelector("progress")}, ${
-					this.show_progress
+					this.showProgress
 				}`
 			);
 
@@ -209,16 +266,13 @@ export default class Copy_With_Style {
 				: button.parentElement.querySelector("progress");
 
 		// If we're showing a progress bar we MUST defer to UI or it won't update
-		if (this.show_progress && this.progress)
+		if (this.showProgress && this.progress)
 			if (this.defer_to_UI)
 				this.defer_to_UI[0] = 0; // Force a deferral or progress bar won't update, but leave the frequency as specified
 			else this.defer_to_UI = [0, 0]; // Force deferral, and request optimized frequency
 
-		this.HTML = null;
-		this.text = null;
-
 		if (this.debug) console.log(`Configuring button: ${triggers}`);
-		this.button.classList.add(this.class_button); // The default styling class
+		this.button.classList.add(this.buttonClass); // The default styling class
 		if (this.triggers.includes("button"))
 			button.addEventListener("click", this.copy.bind(this));
 		else button.addEventListener("click", this.to_clipboard.bind(this));
@@ -231,20 +285,12 @@ export default class Copy_With_Style {
 			this.#schedule_observation();
 	}
 
-	async copy(content) {
-		// By default use the prepared content
-		if (content instanceof MouseEvent || content === undefined) {
-			if (!this.#is_prepared) {
-				await this.#ready_to_prepare("copy");
-				await this.prepare_copy();
-			}
-			this.to_clipboard();
-			// But support injection of arbitrary content as well
-		} else if (typeof content === "string" || content instanceof String) {
-			this.#copy_to_clipboard(content);
-		} else if (typeof content.toString === "function") {
-			this.#copy_to_clipboard(content.toString());
+	async copy() {
+		if (!this.#is_prepared) {
+			await this.#ready_to_prepare("copy");
+			await this.prepare_copy();
 		}
+		this.to_clipboard();
 	}
 
 	async to_clipboard() {
@@ -255,12 +301,12 @@ export default class Copy_With_Style {
 		//if (!this.#is_prepared) await this.prepare_copy();
 		this.button.disabled = true;
 
-		if (this.log_HTML_to_console) {
+		if (this.logHTML) {
 			console.log("to_clipboard HTML:");
 			console.log(this.HTML);
 		}
 
-		if (this.log_text_to_console) {
+		if (this.logText) {
 			console.log("to_clipboard text:");
 			console.log(this.text);
 		}
@@ -280,12 +326,12 @@ export default class Copy_With_Style {
 	#bailed = false; // Set when the request is honoured
 
 	// A working copy of element used for preparing the copy
-	#clone = null;
+	#clone: HTMLElement | null = null;
 
 	// Invalidate any existing copy preparation
 	invalidate() {
 		this.#is_prepared = false;
-		this.button.classList.remove(this.class_ready);
+		this.button.classList.remove(this.readyClass);
 	}
 
 	// If element take some time to get ready, (build the HTML for), any bulder can call .lock() before starting
@@ -344,15 +390,15 @@ export default class Copy_With_Style {
 		let start = performance.now();
 		this.#is_being_prepared = true;
 		this.button.disabled = this.observe; // disable it if we are observing element for changes, else leave it enabled to restart a preparation.
-		this.button.classList.add(this.class_preparing);
+		this.button.classList.add(this.prepareClass);
 		await this.#defer_to_UI(); // Allow the button to render disabled
 
 		if (this.debug)
 			console.log(
-				`Preparing progress bar: ${this.progress}, ${this.show_progress}`
+				`Preparing progress bar: ${this.progress}, ${this.showProgress}`
 			);
 		if (this.progress) {
-			if (this.show_progress) {
+			if (this.showProgress) {
 				if (this.debug) console.log("Enabling progress bar!");
 				this.progress.value = 0;
 				this.progress.style.display = "inline";
@@ -362,7 +408,8 @@ export default class Copy_With_Style {
 			}
 		}
 
-		this.#clone = this.element.cloneNode(true); // Clone the element we want to copy to the clipboard
+		// Clone the element we want to copy to the clipboard
+		this.#clone = this.element.cloneNode(true);
 
 		const source = this.element.querySelectorAll("*");
 		const target = this.#clone.querySelectorAll("*");
@@ -377,7 +424,7 @@ export default class Copy_With_Style {
 					cloned_well = false;
 		}
 
-		if (this.log_performance) {
+		if (this.logPerformance) {
 			const done = performance.now();
 			const runtime = done - start;
 			const rate1 = runtime / nelements;
@@ -413,7 +460,7 @@ export default class Copy_With_Style {
 				let defer = this.defer_to_UI;
 				let i = 0;
 
-				if (this.show_progress && this.progress) {
+				if (this.showProgress && this.progress) {
 					this.progress.max = nelements;
 					await this.#defer_to_UI();
 					// If frequency is 0, optimize it (find how many elements per pixel in the bar and don't refresh more often than that)
@@ -441,7 +488,7 @@ export default class Copy_With_Style {
 						`UI deferral policy: [${defer}]. Now inlining styles for ${nelements} elements.`
 					);
 
-				if (this.log_performance) {
+				if (this.logPerformance) {
 					const done = performance.now();
 					const runtime = done - start;
 					const rate1 = runtime / nelements;
@@ -457,7 +504,7 @@ export default class Copy_With_Style {
 						await this.#inline_style(pair[0], pair[1]);
 						i++;
 					}
-					if (this.show_progress && this.progress)
+					if (this.showProgress && this.progress)
 						this.progress.value = i;
 					if (
 						defer &&
@@ -474,7 +521,7 @@ export default class Copy_With_Style {
 					}
 				}
 
-				if (this.log_performance) {
+				if (this.logPerformance) {
 					const done = performance.now();
 					const runtime = done - start;
 					const rate1 = runtime / nelements;
@@ -502,7 +549,7 @@ export default class Copy_With_Style {
 					this.#prune_clone();
 				}
 
-				if (this.log_performance) {
+				if (this.logPerformance) {
 					const done = performance.now();
 					const runtime = done - start;
 					const rate1 = runtime / nelements;
@@ -536,7 +583,7 @@ export default class Copy_With_Style {
 			wrapper.append(this.#clone);
 
 			// Grab the HTML
-			this.HTML = this.copy_wrapper
+			this.HTML = this.copyWrapper
 				? wrapper.outerHTML
 				: wrapper.innerHTML;
 
@@ -544,20 +591,20 @@ export default class Copy_With_Style {
 			// same on chrome to me.
 			this.text = element.innerText;
 
-			if (this.log_HTML_to_console) {
+			if (this.logHTML) {
 				console.log("prepare_copy HTML:");
 				console.log(this.HTML);
 			}
 
-			if (this.log_text_to_console) {
+			if (this.logText) {
 				console.log("prepare_copy text:");
 				console.log(this.text);
 			}
 		}
 
 		this.button.disabled = false;
-		this.button.classList.remove(this.class_preparing);
-		this.button.classList.add(this.class_ready);
+		this.button.classList.remove(this.prepareClass);
+		this.button.classList.add(this.readyClass);
 
 		this.#is_prepared = true;
 		this.#is_being_prepared = false;
@@ -658,24 +705,15 @@ export default class Copy_With_Style {
 	}
 
 	// Straight from: https://stackoverflow.com/questions/26336138/how-can-i-copy-to-clipboard-in-html5-without-using-flash/45352464#45352464
-	async #copy_to_clipboard(content) {
+	async #copy_to_clipboard() {
 		const bound_handler = handler.bind(this);
 
 		function handler(event) {
 			if (this.debug) console.log(`copy event handler triggered!`);
-			// By default use the prepared content
-			if (content === undefined) {
-				event.clipboardData.setData("text/html", this.HTML);
-				event.clipboardData.setData("text/plain", this.text);
-				// But support injection of arbitrary content as well
-			} else if (
-				typeof content === "string" ||
-				content instanceof String
-			) {
-				event.clipboardData.setData("text/plain", content);
-			} else if (typeof content.toString === "function") {
-				event.clipboardData.setData("text/plain", content.toString());
-			}
+
+			event.clipboardData.setData("text/html", this.HTML);
+			event.clipboardData.setData("text/plain", this.text);
+
 			event.preventDefault();
 			document.removeEventListener("copy", bound_handler, true);
 			this.copied = true;
@@ -855,14 +893,14 @@ export default class Copy_With_Style {
 
 	// Determine if a given element is hidden. When inlining styles, hidden elements are dropped.
 	#deep_exclude_from_copy(element) {
-		if (typeof this.deep_exclusions === "function")
-			return this.deep_exclusions(element);
+		if (typeof this.deepExclusions === "function")
+			return this.deepExclusions(element);
 		else {
 			const style = window.getComputedStyle(element);
 			let exclude =
 				style.visibility === "hidden" || style.display === "none";
-			if (typeof this.extra_deep_exclusions === "function")
-				exclude = exclude || this.extra_deep_exclusions(element);
+			if (typeof this.extraDeepExclusions === "function")
+				exclude = exclude || this.extraDeepExclusions(element);
 			return exclude;
 		}
 	}
@@ -873,8 +911,8 @@ export default class Copy_With_Style {
 	// pasted context. And tooltip divs and details/summary tags are also handled as shallow
 	// exclusions.
 	#shallow_exclude_from_copy(element) {
-		if (typeof this.shallow_exclusions === "function")
-			return this.shallow_exclusions(element);
+		if (typeof this.shallowExclusions === "function")
+			return this.shallowExclusions(element);
 		else {
 			// Default shallow exclusions:
 			//   All internal links (the A tag is removed)
@@ -885,9 +923,9 @@ export default class Copy_With_Style {
 					element.getAttribute("href").startsWith("/")) ||
 				(element.nodeName === "DIV" &&
 					element.classList.contains("tooltip")) ||
-				(this.summarize_details && element.nodeName === "DETAILS");
-			if (typeof this.extra_shallow_exclusions === "function")
-				exclude = exclude || this.extra_shallow_exclusions(element);
+				(this.summarizeDetails && element.nodeName === "DETAILS");
+			if (typeof this.extraShallowExclusions === "function")
+				exclude = exclude || this.extraShallowExclusions(element);
 			return exclude;
 		}
 	}
@@ -987,11 +1025,9 @@ export default class Copy_With_Style {
 	}
 
 	// enumerate all the twigs in element tree (that have leaves at the end)
-	#enumerate_clone_twigs(
-		leaves = this.#enumerate_clone_leaves(),
-		element = this.#clone,
-		twigs = []
-	) {
+	#enumerate_clone_twigs(leaves = this.#enumerate_clone_leaves()) {
+		const twigs = [];
+
 		for (let leaf of leaves) twigs.push(this.#twig(leaf));
 		return twigs;
 	}
