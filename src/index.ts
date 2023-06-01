@@ -4,8 +4,8 @@
  * Provides support of a copy button on a web page that copies a nominated element with its rendered style
  * to the clipboard.
  *
- * Offers a option to include all styles with a <style> tag prefixing the elements outerHTML,
- * or alternately with a "style" attribute added to each element (the nominate element and all its children),
+ * Offers an option to include all styles with a <style> tag prefixing the element's outerHTML,
+ * or alternately with a "style" attribute added to each element (the nominated element and all its children),
  * called "inlining" styles.
  *
  * Inlining styles (applying them as "style" attribute on each element) is expensive (slow) and produces more
@@ -106,7 +106,7 @@ export default class CopyWithStyle {
 	// if defined and passed an HTML element as their sole argument. They must return true or
 	// false, true to exclude, false to keep.
 	//
-	// the extra_pair are in addition to default implementations
+	// the `extra_` pairs are in addition to default implementations
 	// the other two replace the default implementations
 	//
 	// Deep exclusions exclude the element and all its children.
